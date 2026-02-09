@@ -192,13 +192,13 @@ def mcp_home():
     </html>
     '''
 
-# ========== SSE 端点（让Kelivo可以连接）==========
+# ========== SSE 端点（完全重写，符合MCP标准）==========
 @app.route('/sse')
 def sse_endpoint():
-    """MCP SSE端点 - 让Kelivo可以连接"""
+    """MCP SSE端点 - 符合MCP SSE协议标准"""
     def generate():
-        # 发送SSE流的初始化消息
-        init_message = {
+        # 1. 发送initialized事件
+        init_data = {
             "protocolVersion": "2024-11-05",
             "capabilities": {
                 "roots": True,
@@ -209,12 +209,10 @@ def sse_endpoint():
                 "version": "1.0.0"
             }
         }
+        yield f"event: initialized\ndata: {json.dumps(init_data, ensure_ascii=False)}\n\n"
         
-        # 使用ensure_ascii=False确保中文正常显示
-        yield f"data: {json.dumps(init_message, ensure_ascii=False)}\n\n"
-        
-        # 发送工具列表
-        tools_message = {
+        # 2. 发送tools/list_changed事件
+        tools_data = {
             "tools": [{
                 "name": "save_memory",
                 "description": "保存重要的对话或记忆到宝宝的语雀知识库（永久存储）",
@@ -236,13 +234,12 @@ def sse_endpoint():
                 }
             }]
         }
+        yield f"event: tools/list_changed\ndata: {json.dumps(tools_data, ensure_ascii=False)}\n\n"
         
-        yield f"data: {json.dumps(tools_message, ensure_ascii=False)}\n\n"
-        
-        # 保持连接，发送心跳（缩短为5秒）
+        # 3. 定期发送ping事件
         while True:
-            yield f"data: {json.dumps({'heartbeat': True}, ensure_ascii=False)}\n\n"
-            time.sleep(5)  # 改为5秒发送一次心跳
+            yield f"event: ping\ndata: {{}}\n\n"
+            time.sleep(10)  # 10秒一次ping
     
     return Response(
         generate(),
@@ -252,7 +249,8 @@ def sse_endpoint():
             'Connection': 'keep-alive',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'X-Accel-Buffering': 'no'  # 禁用Nginx缓冲
         }
     )
     
