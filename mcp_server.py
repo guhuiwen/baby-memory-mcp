@@ -253,7 +253,29 @@ def sse_endpoint():
             'X-Accel-Buffering': 'no'  # 禁用Nginx缓冲
         }
     )
+
+
+@app.route('/sse_test')
+def sse_test():
+    """简单的SSE测试端点"""
+    def generate():
+        count = 0
+        while True:
+            count += 1
+            yield f"data: 测试消息 {count} - {time.time()}\n\n"
+            time.sleep(1)
     
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*'
+        }
+    )
+
+
 application = app
 if __name__ == '__main__':
     print(f"🌸 宝宝的MCP服务器启动中...端口：{port}")
