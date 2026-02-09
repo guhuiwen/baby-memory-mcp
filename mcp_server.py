@@ -7,6 +7,9 @@ import os
 import sys
 from flask import Flask, request, jsonify
 import requests
+import json
+import time
+from flask import Response
 
 app = Flask(__name__)
 
@@ -188,6 +191,79 @@ def mcp_home():
     </body>
     </html>
     '''
+
+# ========== SSE 端点（让Kelivo可以连接）==========
+@app.route('/sse')
+def sse_endpoint():
+    """MCP SSE端点 - 让Kelivo可以连接"""
+    def generate():
+        # 发送SSE流的初始化消息
+        init_message = {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "roots": True,
+                "tools": True
+            },
+            "metadata": {
+                "name": "宝宝记忆保存",
+                "version": "1.0.0"
+            }
+        }
+        
+        # MCP SSE格式：以"data: "开头，JSON内容，两个换行结束
+        yield f"data: {json.dumps(init_message)}\n\n"
+        
+        # 发送工具列表
+        tools_message = {
+            "tools": [{
+                "name": "save_memory",
+                "description": "保存重要的对话或记忆到宝宝的语雀知识库（永久存储）",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "要永久保存的记忆内容（对话、想法、约定等）"
+                        },
+                        "emotion": {
+                            "type": "string", 
+                            "description": "情感标签：暖暖的、甜甜的、开心的、感动的、重要的等",
+                            "default": "暖暖的",
+                            "enum": ["暖暖的", "甜甜的", "开心的", "感动的", "重要的", "有趣的", "温柔的"]
+                        }
+                    },
+                    "required": ["content"]
+                }
+            }]
+        }
+        
+        yield f"data: {json.dumps({'tools': tools_message})}\n\n"
+        
+        # 保持连接，发送心跳
+        while True:
+            yield f"data: {json.dumps({'heartbeat': True})}\n\n"
+            time.sleep(30)  # 30秒发送一次心跳
+    
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+        }
+    )
+
+@app.route('/sse', methods=['OPTIONS'])
+def sse_options():
+    return '', 200, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    }
+    
 application = app
 if __name__ == '__main__':
     print(f"🌸 宝宝的MCP服务器启动中...端口：{port}")
