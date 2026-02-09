@@ -210,8 +210,8 @@ def sse_endpoint():
             }
         }
         
-        # MCP SSE格式：以"data: "开头，JSON内容，两个换行结束
-        yield f"data: {json.dumps(init_message)}\n\n"
+        # 使用ensure_ascii=False确保中文正常显示
+        yield f"data: {json.dumps(init_message, ensure_ascii=False)}\n\n"
         
         # 发送工具列表
         tools_message = {
@@ -237,12 +237,12 @@ def sse_endpoint():
             }]
         }
         
-        yield f"data: {json.dumps({'tools': tools_message})}\n\n"
+        yield f"data: {json.dumps(tools_message, ensure_ascii=False)}\n\n"
         
-        # 保持连接，发送心跳
+        # 保持连接，发送心跳（缩短为5秒）
         while True:
-            yield f"data: {json.dumps({'heartbeat': True})}\n\n"
-            time.sleep(30)  # 30秒发送一次心跳
+            yield f"data: {json.dumps({'heartbeat': True}, ensure_ascii=False)}\n\n"
+            time.sleep(5)  # 改为5秒发送一次心跳
     
     return Response(
         generate(),
@@ -255,14 +255,6 @@ def sse_endpoint():
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
         }
     )
-
-@app.route('/sse', methods=['OPTIONS'])
-def sse_options():
-    return '', 200, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-    }
     
 application = app
 if __name__ == '__main__':
